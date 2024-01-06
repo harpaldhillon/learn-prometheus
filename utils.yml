@@ -1,0 +1,10 @@
+- name: utilities
+  hosts: all
+  become: yes
+  tasks:
+  - name: install stree
+    apt:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - stress

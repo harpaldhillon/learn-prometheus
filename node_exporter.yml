@@ -1,0 +1,70 @@
+- name: Node Exporter Configuration
+  hosts: all
+  become: yes
+  tasks:
+  - name: node exporter user
+    user:
+      name: node_exporter
+      state: present
+      system: yes
+   
+  - name: download node exporter package
+    get_url:
+      url: "https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-arm64.tar.gz"
+      dest: "/tmp/node_exporter-1.7.0.linux-arm64.tar.gz"
+
+  - name: untar package
+    unarchive:
+      src: "/tmp/node_exporter-1.7.0.linux-arm64.tar.gz"
+      dest: "/tmp/"
+
+  - name: move node exporter binaries
+    copy:
+      src: "/tmp/node_exporter-1.7.0.linux-arm64/{{ item }}"
+      dest: "/usr/local/bin"
+      mode: u+x
+    loop:
+      - node_exporter
+
+  - name: change node exporter binaries permissions
+    file:
+      path: "/usr/local/bin/{{ item }}"
+      mode: "0777"
+      owner: node_exporter
+      group: node_exporter
+    loop:
+      - node_exporter
+
+  - name: copy service file
+    copy:
+      src: "./files/node_exporter.service"
+      dest: "/etc/systemd/system/node_exporter.service"
+
+  - name: change node exporter service file permissions
+    file:
+      path: "/etc/systemd/system/{{ item }}"
+      mode: "0777"
+    loop:
+      - node_exporter.service
+
+  - name: reload daemon for node exporter service
+    systemd:
+      name: node_exporter
+      state: restarted
+      enabled: yes
+      daemon_reload: yes
+
+  - name: capture status of node exporter service
+    systemd:
+      name: node_exporter
+    register: service_status
+
+  - name: display node exporter service status
+    debug:
+      msg: "Node Exporter service status is {{ service_status.status.ActiveState }}"
+
+  handlers:
+    - name: Restart Service
+      service:
+        name: node_exporter
+        state: restarted

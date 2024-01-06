@@ -1,0 +1,31 @@
+- name: Add prometheus system user
+  hosts: all
+  become: yes
+  tasks:
+  - name: install libfontconfig
+    apt:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - libfontconfig1
+      - musl
+
+  - name: install grafana
+    apt:
+      deb: https://dl.grafana.com/enterprise/release/grafana-enterprise_10.2.3_arm64.deb
+
+  - name: start grafana service
+    systemd:
+      name: grafana-server
+      state: restarted
+      enabled: yes
+      daemon_reload: yes
+
+  - name: capture status of grafana service
+    systemd:
+      name: grafana-server
+    register: service_status
+
+  - name: display grafana service status
+    debug:
+      msg: "Grafana service status is {{ service_status.status.ActiveState }}"

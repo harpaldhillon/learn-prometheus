@@ -1,0 +1,117 @@
+- name: Add prometheus system user
+  hosts: all
+  become: yes
+  tasks:
+  - name: prom user
+    user:
+      name: prometheus
+      state: present
+      system: yes
+
+  - name: create prom directory
+    file:
+      path: "/etc/prometheus"
+      state: directory
+      owner: prometheus
+      group: prometheus
+      mode: "0755"
+
+  - name: create prometheus lib folder
+    file:
+      path: "/var/lib/prometheus"
+      state: directory
+      owner: prometheus
+      group: prometheus
+      mode: "0777"
+   
+  - name: download prometheus
+    get_url:
+      url: "https://github.com/prometheus/prometheus/releases/download/v2.48.1/prometheus-2.48.1.linux-arm64.tar.gz"
+      dest: "/tmp/prometheus-2.48.1.linux-arm64.tar.gz"
+
+  - name: untar package
+    unarchive:
+      src: "/tmp/prometheus-2.48.1.linux-arm64.tar.gz"
+      dest: "/tmp/"
+
+  - name: copy config folders
+    copy:
+      src: "/tmp/prometheus-2.48.1.linux-arm64/{{ item }}"
+      dest: "/etc/prometheus"
+      mode: "0755"
+    loop:
+      - consoles
+      - console_libraries
+
+  - name: move prometheus binaries
+    copy:
+      src: "/tmp/prometheus-2.48.1.linux-arm64/{{ item }}"
+      dest: "/usr/local/bin"
+      mode: u+x
+    loop:
+      - prometheus
+      - promtool
+
+  - name: change prometheus binaries permissions
+    file:
+      path: "/usr/local/bin/{{ item }}"
+      mode: "0777"
+      owner: prometheus
+      group: prometheus
+    loop:
+      - prometheus
+      - promtool
+
+  - name: copy prometheus file
+    copy:
+      src: "./files/prometheus.yml"
+      dest: "/etc/prometheus/prometheus.yml"
+    notify: Restart Service
+
+  - name: set folder permissions
+    file:
+      path: "/etc/prometheus"
+      recurse: yes
+      owner: prometheus
+      group: prometheus
+
+  - name: set folder permissions var lib
+    file:
+      path: "/var/lib/prometheus"
+      recurse: yes
+      owner: prometheus
+      group: prometheus
+
+  - name: copy service file
+    copy:
+      src: "./files/prometheus.service"
+      dest: "/etc/systemd/system/prometheus.service"
+
+  - name: change prometheus binaries permissions
+    file:
+      path: "/etc/systemd/system/{{ item }}"
+      mode: "0777"
+    loop:
+      - prometheus.service
+
+  - name: reload daemon for prometheus service
+    systemd:
+      name: prometheus
+      state: restarted
+      enabled: yes
+      daemon_reload: yes
+
+  - name: capture status of prometheus service
+    systemd:
+      name: prometheus
+    register: service_status
+
+  - name: display prometheus service status
+    debug:
+      msg: "Prometheus service status is {{ service_status.status.ActiveState }}"
+
+  handlers:
+    - name: Restart Service
+      service:
+        name: prometheus
+        state: restarted
